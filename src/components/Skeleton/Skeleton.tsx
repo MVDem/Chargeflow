@@ -5,6 +5,7 @@ interface SkeletonProps {
   width?: string;
   height?: string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function Skeleton({
@@ -12,10 +13,12 @@ export function Skeleton({
   width,
   height,
   className = '',
+  style: customStyle,
 }: SkeletonProps) {
   const style = {
     width: width || undefined,
     height: height || undefined,
+    ...customStyle,
   };
 
   return (

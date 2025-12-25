@@ -7,12 +7,14 @@ interface TodoListProps {
   todos: Todo[];
   hideCompleted: boolean;
   onToggleHideCompleted: () => void;
+  onToggleTodo: (todo: Todo) => Promise<void>;
 }
 
 export function TodoList({
   todos,
   hideCompleted,
   onToggleHideCompleted,
+  onToggleTodo,
 }: TodoListProps) {
   const filteredTodos = useMemo(() => {
     if (hideCompleted) {
@@ -62,7 +64,7 @@ export function TodoList({
 
       <div className={styles.list}>
         {filteredTodos.map((todo) => (
-          <TodoItem key={todo.id} todo={todo} />
+          <TodoItem key={todo.id} todo={todo} onToggle={onToggleTodo} />
         ))}
       </div>
 

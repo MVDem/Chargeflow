@@ -3,15 +3,22 @@ import type { Todo } from '../../types/todo';
 
 interface TodoItemProps {
   todo: Todo;
+  onToggle?: (todo: Todo) => Promise<void>;
 }
 
-export function TodoItem({ todo }: TodoItemProps) {
+export function TodoItem({ todo, onToggle }: TodoItemProps) {
+  const handleChange = () => {
+    if (onToggle) {
+      onToggle(todo);
+    }
+  };
+
   return (
     <div className={`${styles.item} ${todo.completed ? styles.completed : ''}`}>
       <input
         type="checkbox"
         checked={todo.completed}
-        readOnly
+        onChange={handleChange}
         className={styles.checkbox}
         aria-label={`${todo.title} - ${
           todo.completed ? 'completed' : 'not completed'

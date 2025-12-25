@@ -42,3 +42,31 @@ export const fetchTodosByUserId = (
 
 export const fetchAllTodos = (): TE.TaskEither<ApiError, Todo[]> =>
   fetchJson<Todo[]>(`${API_BASE_URL}/todos`);
+
+export const updateTodo = (todo: Todo): TE.TaskEither<ApiError, Todo> =>
+  TE.tryCatch(
+    async () => {
+      const response = await fetch(`${API_BASE_URL}/todos/${todo.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(todo),
+      });
+
+      if (!response.ok) {
+        throw createApiError(
+          `HTTP error! status: ${response.status}`,
+          response.status
+        );
+      }
+
+      return response.json() as Promise<Todo>;
+    },
+    (error) => {
+      if (error instanceof Error) {
+        return createApiError(error.message);
+      }
+      return createApiError('Unknown error occurred');
+    }
+  );

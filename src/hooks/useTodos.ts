@@ -1,12 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import * as E from 'fp-ts/Either';
-import type { Todo } from '../types/todo';
-import type { ApiError } from '../api/users';
+import * as O from 'fp-ts/Option';
+import { pipe } from 'fp-ts/function';
+import type { Todo } from '../types/todo.codec';
+import type { DomainError } from '../types/errors';
 import { fetchTodosByUserId, updateTodo } from '../api/todos';
+import { unwrapTaskEither } from '../utils/reactQuery';
+import { TodoLens } from '../utils/lenses';
+import { UserId } from '../types/branded';
+import { logger } from '../utils/logger';
+import { extractErrorMessage } from '../utils/errorHelpers';
+import { defaultQueryOptions } from '../config/reactQuery';
 
 interface UseTodosOptions {
-  userId: number | null;
+  userId: O.Option<UserId>;
   enabled?: boolean;
 }
 
@@ -19,7 +26,7 @@ interface UseTodosReturn {
   todos: Todo[];
   isLoading: boolean;
   isError: boolean;
-  error: ApiError | null;
+  error: DomainError | null;
   refetch: () => void;
   toggleTodo: (todo: Todo) => Promise<void>;
   toast: ToastState | null;
@@ -33,70 +40,86 @@ export const useTodos = ({
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  const query = useQuery({
-    queryKey: ['todos', userId],
-    queryFn: async () => {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
-
-      const result = await fetchTodosByUserId(userId)();
-
-      if (E.isLeft(result)) {
-        throw result.left;
-      }
-
-      return result.right;
-    },
-    enabled: enabled && userId !== null,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+  const query = useQuery<Todo[], DomainError>({
+    queryKey: [
+      'todos',
+      pipe(
+        userId,
+        O.getOrElseW(() => null)
+      ),
+    ],
+    queryFn: () =>
+      pipe(
+        userId,
+        O.match(
+          () => Promise.reject(new Error('User ID is required')),
+          (id) => unwrapTaskEither(fetchTodosByUserId(id))
+        )
+      ),
+    enabled: enabled && O.isSome(userId),
+    ...defaultQueryOptions,
   });
 
-  const mutation = useMutation({
-    mutationFn: async (todo: Todo) => {
-      console.log('Mutation started for todo:', todo);
-      const result = await updateTodo(todo)();
-
-      if (E.isLeft(result)) {
-        throw result.left;
-      }
-
-      return result.right;
+  const mutation = useMutation<
+    Todo,
+    DomainError,
+    Todo,
+    { previousTodos?: Todo[] }
+  >({
+    mutationFn: (todo: Todo) => {
+      logger.mutation('Started', { todoId: todo.id });
+      return unwrapTaskEither(updateTodo(todo));
     },
     onMutate: async (updatedTodo: Todo) => {
-      console.log('onMutate - Optimistic update for:', updatedTodo);
+      logger.mutation('Optimistic update', { todoId: updatedTodo.id });
+      const userIdValue = pipe(
+        userId,
+        O.getOrElseW(() => null)
+      );
+
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['todos', userId] });
+      await queryClient.cancelQueries({ queryKey: ['todos', userIdValue] });
 
       // Snapshot previous value
-      const previousTodos = queryClient.getQueryData<Todo[]>(['todos', userId]);
+      const previousTodos = queryClient.getQueryData<Todo[]>([
+        'todos',
+        userIdValue,
+      ]);
 
       // Optimistically update
       if (previousTodos) {
-        queryClient.setQueryData<Todo[]>(['todos', userId], (old) =>
-          old?.map((todo) =>
-            todo.id === updatedTodo.id ? updatedTodo : todo
-          ) ?? []
+        queryClient.setQueryData<Todo[]>(
+          ['todos', userIdValue],
+          (old) =>
+            old?.map((todo) =>
+              todo.id === updatedTodo.id ? updatedTodo : todo
+            ) ?? []
         );
       }
 
       return { previousTodos };
     },
     onError: (error, _updatedTodo, context) => {
-      console.error('onError - Mutation failed:', error);
+      logger.error('Mutation failed', error, { todoId: _updatedTodo.id });
+      const userIdValue = pipe(
+        userId,
+        O.getOrElseW(() => null)
+      );
+
       // Rollback on error
       if (context?.previousTodos) {
-        queryClient.setQueryData(['todos', userId], context.previousTodos);
+        queryClient.setQueryData(['todos', userIdValue], context.previousTodos);
       }
 
+      const errorMessage = extractErrorMessage(error, 'Failed to update TODO');
+
       setToast({
-        message:
-          error instanceof Error ? error.message : 'Failed to update TODO',
+        message: errorMessage,
         type: 'error',
       });
     },
     onSuccess: () => {
-      console.log('onSuccess - Mutation succeeded');
+      logger.mutation('Success');
       setToast({
         message:
           'Note: JSONPlaceholder is a fake API. Changes are not persisted and will be reverted.',
@@ -104,15 +127,23 @@ export const useTodos = ({
       });
     },
     onSettled: () => {
-      console.log('onSettled - Refetching data');
+      logger.mutation('Settled - Refetching data');
+      const userIdValue = pipe(
+        userId,
+        O.getOrElseW(() => null)
+      );
       // Refetch after error or success
-      queryClient.invalidateQueries({ queryKey: ['todos', userId] });
+      queryClient.invalidateQueries({ queryKey: ['todos', userIdValue] });
     },
   });
 
   const toggleTodo = async (todo: Todo): Promise<void> => {
-    console.log('toggleTodo called for:', todo);
-    const updatedTodo = { ...todo, completed: !todo.completed };
+    logger.mutation('Toggle todo', {
+      todoId: todo.id,
+      completed: todo.completed,
+    });
+    // Use monocle-ts lens for immutable update
+    const updatedTodo = TodoLens.completed.modify((c) => !c)(todo);
     await mutation.mutateAsync(updatedTodo);
   };
 
@@ -124,7 +155,7 @@ export const useTodos = ({
     todos: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
-    error: query.error as ApiError | null,
+    error: query.error as DomainError | null,
     refetch: query.refetch,
     toggleTodo,
     toast,

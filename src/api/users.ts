@@ -1,53 +1,42 @@
 import * as TE from 'fp-ts/TaskEither';
+import * as A from 'fp-ts/Array';
 import { pipe } from 'fp-ts/function';
-import type { User } from '../types/user';
+import { fetchJson } from './core/http';
+import { UserCodec, UsersCodec, type User } from '../types/user.codec';
+import { UserOrd } from '../utils/ord';
+import { UserId } from '../types/branded';
+import { DomainError } from '../types/errors';
 
 const API_BASE_URL = 'https://jsonplaceholder.typicode.com';
 
-export interface ApiError {
-  message: string;
-  status?: number;
-}
-
-const createApiError = (message: string, status?: number): ApiError => ({
-  message,
-  status,
-});
-
-const fetchJson = <T>(url: string): TE.TaskEither<ApiError, T> =>
-  TE.tryCatch(
-    async () => {
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw createApiError(
-          `HTTP error! status: ${response.status}`,
-          response.status
-        );
-      }
-
-      return response.json() as Promise<T>;
-    },
-    (error) => {
-      if (error instanceof Error) {
-        return createApiError(error.message);
-      }
-      return createApiError('Unknown error occurred');
-    }
+/**
+ * Fetches all users from the API
+ * Returns users sorted by name (case-insensitive)
+ * Includes runtime validation with io-ts
+ */
+export const fetchUsers = (): TE.TaskEither<DomainError, User[]> =>
+  pipe(
+    fetchJson(`${API_BASE_URL}/users`, UsersCodec),
+    TE.map(A.sort(UserOrd.byName))
   );
 
-export const fetchUsers = (): TE.TaskEither<ApiError, User[]> =>
+/**
+ * Fetches a single user by ID
+ * Returns NotFoundError if user ID doesn't match
+ */
+export const fetchUserById = (
+  userId: UserId
+): TE.TaskEither<DomainError, User> =>
   pipe(
-    fetchJson<User[]>(`${API_BASE_URL}/users`),
-    TE.map((users) => users.sort((a, b) => a.name.localeCompare(b.name)))
-  );
-
-export const fetchUserById = (userId: number): TE.TaskEither<ApiError, User> =>
-  pipe(
-    fetchJson<User>(`${API_BASE_URL}/users/${userId}`),
+    fetchJson(`${API_BASE_URL}/users/${UserId.unwrap(userId)}`, UserCodec),
     TE.chain((user) =>
-      user.id === userId
+      user.id === UserId.unwrap(userId)
         ? TE.right(user)
-        : TE.left(createApiError(`User with id ${userId} not found`, 404))
+        : TE.left(
+            DomainError.notFoundError(
+              `User with id ${UserId.unwrap(userId)} not found`,
+              String(UserId.unwrap(userId))
+            )
+          )
     )
   );

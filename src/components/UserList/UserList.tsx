@@ -1,14 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
-import * as E from 'fp-ts/Either';
+import * as O from 'fp-ts/Option';
+import { pipe } from 'fp-ts/function';
 import styles from './UserList.module.css';
 import { UserCard } from '../UserCard/UserCard';
-import { Skeleton } from '../Skeleton/Skeleton';
-import type { User } from '../../types/user';
+import { ErrorMessage } from '../ErrorMessage/ErrorMessage';
+import { EmptyState } from '../EmptyState/EmptyState';
+import { UserListSkeleton } from '../UserListSkeleton/UserListSkeleton';
+import type { User } from '../../types/user.codec';
+import type { DomainError } from '../../types/errors';
 import { fetchUsers } from '../../api/users';
+import { unwrapTaskEither } from '../../utils/reactQuery';
+import { UserId } from '../../types/branded';
 
 interface UserListProps {
-  selectedUserId: number | null;
-  onSelectUser: (userId: number) => void;
+  selectedUserId: O.Option<UserId>;
+  onSelectUser: (userId: UserId) => void;
 }
 
 export function UserList({ selectedUserId, onSelectUser }: UserListProps) {
@@ -17,48 +23,29 @@ export function UserList({ selectedUserId, onSelectUser }: UserListProps) {
     isLoading,
     isError,
     error,
-  } = useQuery({
+    refetch,
+  } = useQuery<User[], DomainError>({
     queryKey: ['users'],
-    queryFn: async () => {
-      const result = await fetchUsers()();
-
-      if (E.isLeft(result)) {
-        throw result.left;
-      }
-
-      return result.right;
-    },
+    queryFn: () => unwrapTaskEither(fetchUsers()),
   });
 
   if (isLoading) {
-    return (
-      <div className={styles.grid}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className={styles.skeletonCard}>
-            <Skeleton height="1.5rem" width="70%" />
-            <Skeleton height="1rem" width="50%" />
-            <Skeleton height="2.5rem" variant="rectangular" />
-          </div>
-        ))}
-      </div>
-    );
+    return <UserListSkeleton />;
   }
 
   if (isError) {
     return (
-      <div className={styles.error}>
-        <h3>Error loading users</h3>
-        <p>{error instanceof Error ? error.message : 'Unknown error'}</p>
-      </div>
+      <ErrorMessage
+        title="Error loading users"
+        error={error}
+        fallbackMessage="Failed to load users. Please try again."
+        onRetry={refetch}
+      />
     );
   }
 
   if (!users || users.length === 0) {
-    return (
-      <div className={styles.empty}>
-        <p>No users found.</p>
-      </div>
-    );
+    return <EmptyState message="No users found." icon="👥" />;
   }
 
   return (
@@ -67,8 +54,11 @@ export function UserList({ selectedUserId, onSelectUser }: UserListProps) {
         <UserCard
           key={user.id}
           user={user}
-          isSelected={user.id === selectedUserId}
-          onShowTodos={() => onSelectUser(user.id)}
+          isSelected={pipe(
+            selectedUserId,
+            O.exists((id) => UserId.unwrap(id) === user.id)
+          )}
+          onShowTodos={() => onSelectUser(UserId.wrap(user.id))}
         />
       ))}
     </div>

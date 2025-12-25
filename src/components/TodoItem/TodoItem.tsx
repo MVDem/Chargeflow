@@ -1,5 +1,5 @@
 import styles from './TodoItem.module.css';
-import type { Todo } from '../../types/todo';
+import type { Todo } from '../../types/todo.codec';
 
 interface TodoItemProps {
   todo: Todo;
@@ -7,9 +7,15 @@ interface TodoItemProps {
 }
 
 export function TodoItem({ todo, onToggle }: TodoItemProps) {
-  const handleChange = () => {
+  const handleChange = async () => {
     if (onToggle) {
-      onToggle(todo);
+      try {
+        await onToggle(todo);
+      } catch (error) {
+        // Error is already handled in useTodos with toast notification
+        // This prevents unhandled promise rejection warnings
+        console.error('Failed to toggle todo:', error);
+      }
     }
   };
 

@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
+import * as A from 'fp-ts/Array';
+import * as NEA from 'fp-ts/NonEmptyArray';
+import * as O from 'fp-ts/Option';
+import { pipe } from 'fp-ts/function';
 import styles from './TodoList.module.css';
 import { TodoItem } from '../TodoItem/TodoItem';
-import type { Todo } from '../../types/todo';
+import { EmptyState } from '../EmptyState/EmptyState';
+import type { Todo } from '../../types/todo.codec';
 
 interface TodoListProps {
   todos: Todo[];
@@ -16,25 +21,39 @@ export function TodoList({
   onToggleHideCompleted,
   onToggleTodo,
 }: TodoListProps) {
-  const filteredTodos = useMemo(() => {
-    if (hideCompleted) {
-      return todos.filter((todo) => !todo.completed);
-    }
-    return todos;
-  }, [todos, hideCompleted]);
+  const filteredTodos = useMemo(
+    () =>
+      pipe(
+        todos,
+        hideCompleted ? A.filter((todo) => !todo.completed) : (x) => x
+      ),
+    [todos, hideCompleted]
+  );
 
-  const stats = useMemo(() => {
-    const completed = todos.filter((t) => t.completed).length;
-    const total = todos.length;
-    return { completed, total, remaining: total - completed };
-  }, [todos]);
+  const stats = useMemo(
+    () =>
+      pipe(
+        todos,
+        NEA.fromArray,
+        O.fold(
+          // Empty array
+          () => ({ completed: 0, total: 0, remaining: 0 }),
+          // Non-empty array
+          (nonEmptyTodos) => {
+            const completed = pipe(
+              nonEmptyTodos,
+              A.filter((t: Todo) => t.completed)
+            ).length;
+            const total = nonEmptyTodos.length;
+            return { completed, total, remaining: total - completed };
+          }
+        )
+      ),
+    [todos]
+  );
 
   if (todos.length === 0) {
-    return (
-      <div className={styles.empty}>
-        <p>No TODOs found for this user.</p>
-      </div>
-    );
+    return <EmptyState message="No TODOs found for this user." icon="📝" />;
   }
 
   return (

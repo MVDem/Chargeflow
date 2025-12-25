@@ -26,8 +26,22 @@
 .message {
   font-size: 1rem;
   color: var(--color-text-secondary);
-  margin: 0 0 var(--spacing-xl) 0;
+  margin: 0 0 var(--spacing-md) 0;
   line-height: 1.6;
+}
+
+.suggestion {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-xl) 0;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .button {
@@ -54,5 +68,13 @@
   &:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+  }
+}
+
+.button.secondary {
+  background-color: var(--color-bg-secondary, #6c757d);
+
+  &:hover {
+    background-color: var(--color-bg-secondary-hover, #5a6268);
   }
 }

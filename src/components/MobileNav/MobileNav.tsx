@@ -1,10 +1,16 @@
 import { useMobileNav } from './useMobileNav';
 import styles from './MobileNav.module.css';
 import { cloneElement, isValidElement } from 'react';
+import type { ReactElement } from 'react';
+import type { UserId } from '../../types/branded';
 
 interface MobileNavProps {
   children: React.ReactNode;
   onUserSelect?: () => void;
+}
+
+interface UserListChildProps {
+  onSelectUser?: (userId: UserId) => void;
 }
 
 export function MobileNav({ children, onUserSelect }: MobileNavProps) {
@@ -19,9 +25,10 @@ export function MobileNav({ children, onUserSelect }: MobileNavProps) {
 
   // Clone children and inject close handler
   const childrenWithProps = isValidElement(children)
-    ? cloneElement(children as React.ReactElement<any>, {
-        onSelectUser: (userId: number) => {
-          const originalOnSelect = (children as any).props.onSelectUser;
+    ? cloneElement(children as ReactElement<UserListChildProps>, {
+        onSelectUser: (userId: UserId) => {
+          const element = children as ReactElement<UserListChildProps>;
+          const originalOnSelect = element.props.onSelectUser;
           if (originalOnSelect) {
             originalOnSelect(userId);
           }
@@ -49,13 +56,6 @@ export function MobileNav({ children, onUserSelect }: MobileNavProps) {
         <>
           <div className={styles.backdrop} onClick={closeMenu} />
           <div className={styles.panel}>
-            <button
-              className={styles.closeButton}
-              onClick={closeMenu}
-              aria-label="Close menu"
-            >
-              ×
-            </button>
             <h2 className={styles.title}>Users</h2>
             {childrenWithProps}
           </div>

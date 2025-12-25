@@ -1,0 +1,32 @@
+.empty {
+  padding: 3rem 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px dashed #dee2e6;
+  border-radius: 12px;
+  margin: 1rem 0;
+}
+
+.icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.message {
+  color: #6c757d;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}

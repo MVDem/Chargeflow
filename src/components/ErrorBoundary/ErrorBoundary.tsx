@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react';
 import styles from './ErrorBoundary.module.css';
+import { logger } from '../../utils/logger';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -31,14 +32,16 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error', error, { errorInfo });
   }
 
   handleReset = (): void => {
-    this.setState({
-      hasError: false,
-      error: null,
-    });
+    // Navigate to home page
+    window.location.href = '/';
+  };
+
+  handleReload = (): void => {
+    window.location.reload();
   };
 
   render(): ReactNode {
@@ -54,13 +57,26 @@ export class ErrorBoundary extends Component<
             <p className={styles.message}>
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
-            <button
-              className={styles.button}
-              onClick={this.handleReset}
-              type="button"
-            >
-              Try again
-            </button>
+            <p className={styles.suggestion}>
+              The application encountered an unexpected error. You can try
+              reloading the page or going back to the home page.
+            </p>
+            <div className={styles.actions}>
+              <button
+                className={styles.button}
+                onClick={this.handleReload}
+                type="button"
+              >
+                Reload Page
+              </button>
+              <button
+                className={`${styles.button} ${styles.secondary}`}
+                onClick={this.handleReset}
+                type="button"
+              >
+                Go to Home
+              </button>
+            </div>
           </div>
         </div>
       );

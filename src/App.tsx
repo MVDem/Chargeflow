@@ -6,6 +6,7 @@ import { Home } from './pages/Home/Home';
 import { NotFound } from './pages/NotFound/NotFound';
 import { ErrorPage } from './pages/Error/Error';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { OfflineDetector } from './components/OfflineDetector/OfflineDetector';
 import './App.css';
 
 const router = createBrowserRouter([
@@ -24,6 +25,7 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <OfflineDetector />
         <RouterProvider router={router} />
       </QueryClientProvider>
     </ErrorBoundary>

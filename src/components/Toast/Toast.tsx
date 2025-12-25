@@ -17,12 +17,18 @@ export function Toast({
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const hideTimer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onClose, 300); // Wait for animation
     }, duration);
 
-    return () => clearTimeout(timer);
+    const closeTimer = setTimeout(() => {
+      onClose();
+    }, duration + 300); // Wait for hiding animation
+
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(closeTimer);
+    };
   }, [duration, onClose]);
 
   return (

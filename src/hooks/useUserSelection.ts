@@ -1,9 +1,12 @@
 import { useSearchParams } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
+import * as O from 'fp-ts/Option';
+import { pipe } from 'fp-ts/function';
+import { UserId } from '../types/branded';
 
 interface UseUserSelectionReturn {
-  selectedUserId: number | null;
-  selectUser: (userId: number) => void;
+  selectedUserId: O.Option<UserId>;
+  selectUser: (userId: UserId) => void;
   clearSelection: () => void;
   hideCompleted: boolean;
   toggleHideCompleted: () => void;
@@ -13,20 +16,24 @@ interface UseUserSelectionReturn {
 export const useUserSelection = (): UseUserSelectionReturn => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const selectedUserId = useMemo(() => {
-    const userIdParam = searchParams.get('userId');
-    return userIdParam ? parseInt(userIdParam, 10) : null;
-  }, [searchParams]);
+  const selectedUserId = useMemo(
+    () =>
+      pipe(
+        O.fromNullable(searchParams.get('userId')),
+        O.chain(UserId.fromString)
+      ),
+    [searchParams]
+  );
 
   const hideCompleted = useMemo(() => {
     return searchParams.get('hideCompleted') === 'true';
   }, [searchParams]);
 
   const selectUser = useCallback(
-    (userId: number) => {
+    (userId: UserId) => {
       setSearchParams((prev) => {
         const newParams = new URLSearchParams(prev);
-        newParams.set('userId', userId.toString());
+        newParams.set('userId', String(UserId.unwrap(userId)));
         // CRITICAL: Reset hideCompleted filter when user changes
         newParams.delete('hideCompleted');
         return newParams;
